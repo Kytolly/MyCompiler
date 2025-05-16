@@ -3,13 +3,14 @@ use std::io::{Read};
 
 pub struct Preprocessor {
     pub name: String, // 源程序名
-    pub content: String,
+    pub content: String, // 源程序字符流
 }
 
 impl Preprocessor {
     pub fn new(path: &str) -> Self{
+        let parts :Vec<&str>= path.split('.').collect();
         let mut p = Preprocessor{
-            name: String::from(path),
+            name: parts.first().unwrap_or(&"").to_string(),
             content: String::new(),
         };
         let mut input = File::open(path).unwrap();

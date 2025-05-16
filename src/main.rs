@@ -5,10 +5,7 @@ use lex::Lexer;
 
 fn main() {
     let preprocessor = Preprocessor::new("test/pas_test.pas");
-    let mut lexer = Lexer::new(preprocessor.content);
+    let mut lexer = Lexer::new(preprocessor);
     lexer.analyse();
-    println!("打印token流");
-    for tk in lexer.stream {
-        println!("{:?}", tk);
-    }
+    lexer.save();
 }

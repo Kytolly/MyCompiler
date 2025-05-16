@@ -1,4 +1,9 @@
+use crate::prep::Preprocessor;
+use std::io::{Write};
+use std::fs;
+
 pub struct Lexer {
+    pub name: String, // 源程序名
     pub source: String, // 源程序字符串
     pub cha: Option<char>, // 最新读入的字符
     pub pos: usize, // cha所在位置
@@ -8,9 +13,10 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    pub fn new(s: String) -> Self {
+    pub fn new(p: Preprocessor) -> Self {
         let mut l = Lexer {
-            source: s,
+            name: p.name,
+            source: p.content,
             cha: None,
             pos: usize::MAX,
             token: String::new(),
@@ -76,6 +82,36 @@ impl Lexer {
             Token::Identifier(_) => "标识符",
             Token::IntegerLiteral(_) => "数字串",
             _ => "未知token"
+        }
+    }
+    fn get_symbol(&self, tk: &Token) -> String {
+        match &tk {
+            Token::Begin => "begin".to_string(),
+            Token::End => "end".to_string(),
+            Token::Integer => "integer".to_string(),
+            Token::If => "if".to_string(),
+            Token::Then => "then".to_string(),
+            Token::Else => "else".to_string(),
+            Token::Function => "function".to_string(),
+            Token::Read => "read".to_string(),
+            Token::Write => "write".to_string(),
+            Token::Identifier(s) => s.clone(),
+            Token::IntegerLiteral(n) => n.to_string(),
+            Token::Equal => "=".to_string(),
+            Token::NotEqual => "<>".to_string(),
+            Token::LessEqual => "<=".to_string(),
+            Token::Less => "<".to_string(),
+            Token::GreaterEqual => ">=".to_string(),
+            Token::Greater => ">".to_string(),
+            Token::Minus => "-".to_string(),
+            Token::Multiply => "*".to_string(),
+            Token::Assign => ":=".to_string(),
+            Token::LeftParenthesis => "(".to_string(),
+            Token::RightParenthesis => ")".to_string(),
+            Token::Semicolon => ";".to_string(),
+            Token::Eol => "\\EOL".to_string(),
+            Token::Eof => "\\EOF".to_string(),
+            Token::Illegal(c) => c.to_string(),
         }
     }
 
@@ -194,7 +230,7 @@ impl Lexer {
     // 对token查关键字表
     fn reverse(&self) -> Token {
         let ident = &self.token;
-        return match ident.as_str() {
+        match ident.as_str() {
             "integer" => Token::Integer,
             "function" => Token::Function,
             "if" => Token::If,
@@ -212,17 +248,17 @@ impl Lexer {
     fn literal(&self) -> Token {
         let num = &self.token;
         match num.parse::<i64>() {
-            Ok(n) => {return Token::IntegerLiteral(n)},
-            Err(_) => {return Token::Illegal(self.cha.unwrap_or('\0'))},
+            Ok(n) => Token::IntegerLiteral(n),
+            Err(_) => Token::Illegal(self.cha.unwrap_or('\0')),
         }
     }
 
     // 处理错误
     fn error(errmsg: ErrorMessage) {
         match errmsg {
-            ErrorMessage::InvalidIdentifier => {
-                println!("LINE: 非法标识符！")
-            }
+            // ErrorMessage::InvalidIdentifier => {
+            //     println!("LINE: 非法标识符！")
+            // }
             ErrorMessage::InvalidNumber => {
                 println!("LINE: 非法数字！")
             }
@@ -235,7 +271,8 @@ impl Lexer {
         }
     }
 
-    fn next_token(&mut self) -> Token {
+    // token解析
+    fn current_token(&mut self) -> Token {
         self.getnbc();
 
         println!("开始匹配当前字符{:?}", self.cha);
@@ -243,12 +280,12 @@ impl Lexer {
             Some('\n') => {
                 self.concat();
                 self.getchar();
-                return Token::Eol
+                Token::Eol
             }
             Some(';') => {
                 self.concat();
                 self.getchar();
-                return Token::Semicolon
+                Token::Semicolon
             }
             Some('=') => {
                 self.concat();
@@ -331,22 +368,38 @@ impl Lexer {
     // 分词
     pub fn analyse(&mut self) {
         loop {
-            let tk = self.next_token();
+            let tk = self.current_token();
             println!("检测到新的token,其含义为: {} {}", self.get_meaning(&tk), self.token);
+            println!("记录至token流后重置当前token");
+            self.stream.push(tk.clone());
+            self.token.clear();
+            println!("--------------------------");
             if tk == Token::Eof {
                 break;
             }
-            println!("记录token流后重置当前token");
-            self.stream.push(tk);
-            self.token.clear();
-            println!("--------------------------");
             println!("当前指向字符{:?}", self.cha);
+        }
+    }
+
+    // 输出为文件
+    pub fn save(&mut self){
+        let path = format!("{}.dyd", self.name);
+        let mut file = fs::File::create(&path).expect("创建文件失败");
+        for tk in &self.stream {
+            let id = if self.get_label(tk) < 10 {
+                format!("0{}", self.get_label(tk))
+            } else {
+                format!("{}", self.get_label(tk))
+            };
+            let line = format!("{} {}\n", id, self.get_symbol(tk));
+            file.write_all(line.as_bytes()).expect("写入文件失败");
         }
     }
 }
 
 #[derive(PartialEq)]
 #[derive(Debug)]
+#[derive(Clone)]
 pub enum Token {
     // 标识符
     Identifier(String),
@@ -396,7 +449,7 @@ pub enum Token {
 #[derive(Debug)]
 enum ErrorMessage {
     // 非法标识符
-    InvalidIdentifier,
+    // InvalidIdentifier,
     
     // 非法数字串
     InvalidNumber,
