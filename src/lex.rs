@@ -84,20 +84,15 @@ impl Lexer {
         }
     }
     fn output_error(&self, errmsg:&ErrorMessage) {
-        match errmsg {
-            ErrorMessage::InvalidIdentifier => {
-                eprintln!("LINE{:?}: 非法标识符！", self.line);
-            }
-            ErrorMessage::InvalidNumber => {
-                eprintln!("LINE{:?}: 非法数字！", self.line);
-            }
-            ErrorMessage::OverflowIdentifier => {
-                eprintln!("LINE{:?}: 标识符长度溢出！", self.line);
-            }
-            ErrorMessage::FailMatchingSemicolon => {
-                eprintln!("LINE{:?}: 冒号匹配失败！", self.line);
-            }
-        }
+        let path = format!("{}.err", self.name);
+        let mut file = fs::File::create(&path).expect("创建错误文件失败");
+        let err_msg = match errmsg {
+            ErrorMessage::InvalidIdentifier => format!("LINE{:?}: 非法标识符！", self.line),
+            ErrorMessage::InvalidNumber => format!("LINE{:?}: 非法数字！", self.line),
+            ErrorMessage::OverflowIdentifier => format!("LINE{:?}: 标识符长度溢出！", self.line),
+            ErrorMessage::FailMatchingSemicolon => format!("LINE{:?}: 冒号匹配失败！", self.line),
+        };
+        file.write_all(err_msg.as_bytes()).expect("写入错误文件失败");
     }
 
     fn init_reserve(&mut self) {
@@ -402,25 +397,6 @@ impl Lexer {
     fn parse_indentifier(&mut self) ->Token {
         // 可能的标识符和关键字
         while !self.is_white() {
-            // match self.cha {
-            //     Some(_) => {
-            //         if self.is_dlu() {
-            //             if self.token.len() >= self.max_len {
-            //                 self.error(ErrorMessage::OverflowIdentifier);
-            //                 self.handle_error();
-            //                 break;
-            //             }
-            //             self.concat();
-            //             self.getchar();
-            //         } else {
-            //             // 我也不知道标识符后面不能跟哪些符号
-            //             self.error(ErrorMessage::InvalidIdentifier);
-            //             self.handle_error();
-            //             break;
-            //         }
-            //     }
-            //     None => break,
-            // }
             match self.cha {
                 Some(_) if self.is_dlu() => {
                     if self.token.len() >= self.max_len {
