@@ -1,29 +1,31 @@
 use crate::prep::Preprocessor;
-use crate::constant::{Token, ErrorMessage};
-use std::fmt::Error;
+use crate::setting::{Token, ErrorMessage};
+// use std::fmt::Error;
 use std::io::{Write};
 use std::fs;
 use std::collections::HashMap;
 
 pub struct Lexer {
-    pub name: String, // 源程序名
-    pub source: String, // 源程序字符串
+    name: String, // 源程序名
+    source: String, // 源程序字符串
     pub max_len: usize, // 标识符的最大长度
 
     // 处于简化考虑，将符号表分为三个部分
-    pub reserve_table: HashMap<&'static str, Token>, // 关键字表
-    pub word_table: HashMap<String, Token>, // 标识符表
-    pub literal_table: HashMap<i64, Token>, // 常量表，存储整型数字常量
+    reserve_table: HashMap<&'static str, Token>, // 关键字表
+    word_table: HashMap<String, Token>, // 标识符表
+    literal_table: HashMap<i64, Token>, // 常量表，存储整型数字常量
 
     // 处于简化考虑，没有设计双缓冲区
-    pub cha: Option<char>, // 最新读入的字符
-    pub pos: usize, // cha指针位置
-    pub peek: Option<char>, // 设置缓冲区大小为1
-    pub nxt: usize, // 缓冲区的指针位置
+    cha: Option<char>, // 最新读入的字符
+    pos: usize, // cha指针位置
+    peek: Option<char>, // 设置缓冲区大小为1
+    nxt: usize, // 缓冲区的指针位置
 
-    pub token: String, // 已读入的字符串 
-    pub stream: Vec<Token>, // 已读入的Token流
-    pub line: usize, // 已读入的行数
+    token: String, // 已读入的字符串 
+    line: usize, // 已读入的行数
+
+    
+    stream: Vec<Token>, // 已读入的Token流
 }
 
 impl Lexer {
@@ -48,6 +50,9 @@ impl Lexer {
         };
         l.init_reserve();
         l
+    }
+    pub fn get_stream(&self) -> Vec<Token> {
+        self.stream.clone()
     }
     pub fn analyse(&mut self) {
         // 分词
@@ -83,14 +88,31 @@ impl Lexer {
             file.write_all(line.as_bytes()).expect("写入文件失败");
         }
     }
-    fn output_error(&self, errmsg:&ErrorMessage) {
+    pub fn output_error(&self, errmsg:&ErrorMessage) {
         let path = format!("{}.err", self.name);
         let mut file = fs::File::create(&path).expect("创建错误文件失败");
         let err_msg = match errmsg {
-            ErrorMessage::InvalidIdentifier => format!("LINE{:?}: 非法标识符！", self.line),
+            ErrorMessage::SyntaxError => format!("LINE{:?}: 语法错误！", self.line),
+            ErrorMessage::WrongReserveYouMeanFunction => format!("LINE{:?}: wrong reserve: you mean 'function'?", self.line),
+            ErrorMessage::WrongReserveYouMeanRead => format!("LINE{:?}: wrong reserve: you mean 'read'?", self.line),
+            ErrorMessage::WrongReserveYouMeanWrite => format!("LINE{:?}: wrong reserve: you mean 'write'?", self.line),
+            ErrorMessage::WrongAssignToken => format!("LINE{:?}: wrong assign operator: you mean ':='?", self.line),
+            ErrorMessage::InvalidTypeExpectedInterger => format!("LINE{:?}: invalid type: expected INTEGER", self.line),
             ErrorMessage::InvalidNumber => format!("LINE{:?}: 非法数字！", self.line),
             ErrorMessage::OverflowIdentifier => format!("LINE{:?}: 标识符长度溢出！", self.line),
             ErrorMessage::FailMatchingSemicolon => format!("LINE{:?}: 冒号匹配失败！", self.line),
+            ErrorMessage::MissingSemicolon => format!("LINE{:?}: missing a ';' at the end of the statement", self.line),
+            ErrorMessage::MissingLeftParenthesis => format!("LINE{:?}: expected '(' following the function statement", self.line),
+            ErrorMessage::MissingRightParenthesis => format!("LINE{:?}: expected ')' to cover the block", self.line),
+            ErrorMessage::MissingIf => format!("LINE{:?}: expected 'if' ", self.line),
+            ErrorMessage::MissingThen => format!("LINE{:?}: expected 'then' ", self.line),
+            ErrorMessage::MissingElse => format!("LINE{:?}: expected 'else' ", self.line),
+            ErrorMessage::MissingMultiply => format!("LINE{:?}: expected '*' ", self.line),
+            ErrorMessage::SyntaxErrorExpectedABlock => format!("LINE{:?}: syntax error, expected a block", self.line),
+            ErrorMessage::FailMatching => format!("LINE{:?}: 符号匹配错误!", self.line),
+            ErrorMessage::MissingEnd => format!("LINE{:?}: missing END: this block is not covered", self.line),
+            ErrorMessage::NotFoundDeclarationInThisField => format!("LINE{:?}: this symbol's declaration can not be found in this field", self.line),
+            ErrorMessage::FoundRepeatDeclarationInThisField => format!("LINE{:?}: this symbol's declaration repeated in this field", self.line),
         };
         file.write_all(err_msg.as_bytes()).expect("写入错误文件失败");
     }
@@ -338,35 +360,16 @@ impl Lexer {
         } else {
             self.cha = self.source.chars().nth(self.pos);
         }
+        self.token.pop();
         println!("回退到{:?}", self.cha)
     }
-    fn handle_error(&mut self) {
+    fn skip_bad_line(&mut self) {
         // 处理错误，一直读到换行符
         while self.cha != Some('\n') {
             self.getchar();
         }
     }
-    fn error(&self, errmsg: ErrorMessage) {
-        // 抛出错误
-        // 这里还是简化实现
-        // 应该扔到标准错误流中，写入文件
-        // 不能和标准输出流混合
-        match errmsg {
-            ErrorMessage::InvalidIdentifier => {
-                println!("LINE{:?}: 非法标识符！", self.line);
-            }
-            ErrorMessage::InvalidNumber => {
-                println!("LINE{:?}: 非法数字！", self.line);
-            }
-            ErrorMessage::OverflowIdentifier => {
-                println!("LINE{:?}: 标识符长度溢出！", self.line);
-            }
-            ErrorMessage::FailMatchingSemicolon => {
-                println!("LINE{:?}: 冒号匹配失败！", self.line);
-            }
-        }
-    }
-    fn parse_digits_str(&mut self) -> Token {
+    fn lex_digits_str(&mut self) -> Token {
         // 发现需要解析数字串
         let mut res: i64 = 0;
         let mut tk: Token = Token::Illegal('\0'); // Initialize with default value
@@ -382,7 +385,7 @@ impl Lexer {
                     self.get_peek();
                     if self.peek_is_a() {
                         self.error(ErrorMessage::InvalidNumber);
-                        self.handle_error();
+                        self.skip_bad_line();
                         return Token::Illegal(self.cha.unwrap_or('\0'));
                     }
                     break;
@@ -394,14 +397,14 @@ impl Lexer {
         self.getchar();
         tk
     }
-    fn parse_indentifier(&mut self) ->Token {
+    fn lex_indentifier(&mut self) ->Token {
         // 可能的标识符和关键字
         while !self.is_white() {
             match self.cha {
                 Some(_) if self.is_dlu() => {
                     if self.token.len() >= self.max_len {
                         self.error(ErrorMessage::OverflowIdentifier);
-                        self.handle_error();
+                        self.skip_bad_line();
                         break;
                     }
                     self.concat();
@@ -493,7 +496,7 @@ impl Lexer {
                     }
                     _ => {
                         self.error(ErrorMessage::FailMatchingSemicolon);
-                        self.handle_error();
+                        self.skip_bad_line();
                         Token::Illegal(self.cha.unwrap_or('\0'))
                     }
                 }
@@ -501,18 +504,89 @@ impl Lexer {
             Some(_) if self.is_lu() => {
                 println!("预测为关键字/标识符");
                 self.get_peek();
-                self.parse_indentifier()
+                self.lex_indentifier()
             }
             Some(_) if self.is_d() => {
                 println!("预测为数字串");
                 self.get_peek();
-                self.parse_digits_str()
+                self.lex_digits_str()
             }
             None => {return Token::Eof},
             Some(c) =>{
                 self.getchar();
                 Token::Illegal(c)
             },
+        }
+    }
+    fn error(&self, errmsg: ErrorMessage) {
+        // 抛出错误
+        // 这里还是简化实现
+        // 应该扔到标准错误流中，写入文件
+        // 不能和标准输出流混合
+        match errmsg {
+            ErrorMessage::SyntaxError => {
+                println!("LINE{:?}: 语法错误!", self.line);
+            }
+            ErrorMessage::WrongReserveYouMeanFunction => {
+                println!("LINE{:?}: wrong reserve: you mean 'function'?", self.line);
+            }
+            ErrorMessage::WrongReserveYouMeanRead => {
+                println!("LINE{:?}: wrong reserve: you mean 'read'?", self.line);
+            }
+            ErrorMessage::WrongReserveYouMeanWrite => {
+                println!("LINE{:?}: wrong reserve: you mean 'write'?", self.line);
+            }
+            ErrorMessage::WrongAssignToken => {
+                println!("LINE{:?}: wrong assign operator: you mean ':='?", self.line);
+            }
+            ErrorMessage::InvalidTypeExpectedInterger => {
+                println!("LINE{:?}: 非法的类型,expected integer!", self.line);
+            }
+            ErrorMessage::InvalidNumber => {
+                println!("LINE{:?}: 非法数字!", self.line);
+            }
+            ErrorMessage::OverflowIdentifier => {
+                println!("LINE{:?}: 标识符长度溢出!", self.line);
+            }
+            ErrorMessage::FailMatchingSemicolon => {
+                println!("LINE{:?}: 冒号匹配失败!", self.line);
+            }
+            ErrorMessage::MissingSemicolon => {
+                println!("LINE{:?}: 句尾缺少分号!", self.line);
+            }
+            ErrorMessage::MissingLeftParenthesis => {
+                println!("LINE{:?}: expected '(' following the function statement", self.line);
+            }
+            ErrorMessage::MissingRightParenthesis => {
+                println!("LINE{:?}: expected ')' to cover the block", self.line);
+            }
+            ErrorMessage::MissingThen => {
+                println!("LINE{:?}: expected 'then' ", self.line);
+            }
+            ErrorMessage::MissingIf => {
+                println!("LINE{:?}: expected 'if' ", self.line);
+            }
+            ErrorMessage::MissingElse => {
+                println!("LINE{:?}: expected 'else' ", self.line);
+            }
+            ErrorMessage::MissingMultiply => {
+                println!("LINE{:?}: expected '*' ", self.line);
+            }
+            ErrorMessage::SyntaxErrorExpectedABlock => {
+                println!("LINE{:?}: syntax error, expected a block!", self.line);
+            }
+            ErrorMessage::FailMatching => {
+                println!("LINE{:?}: 符号匹配错误!", self.line);
+            }
+            ErrorMessage::MissingEnd => {
+                println!("LINE{:?}: missing END: this block is not covered", self.line);
+            }
+            ErrorMessage::NotFoundDeclarationInThisField => {
+                println!("LINE{:?}: 符号在该作用域内找不到声明!", self.line);
+            }
+            ErrorMessage::FoundRepeatDeclarationInThisField => {
+                println!("LINE{:?}: 符号在该作用域内重复声明!", self.line);
+            }
         }
     }
 }

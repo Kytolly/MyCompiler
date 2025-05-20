@@ -8,7 +8,7 @@ begin
         then F:= 1;
         else F:= n * F(n-1);
     end
-    read(m);
-    k := F(m);
+    readm);
+    k:= F(m);
     write(k)
 end
