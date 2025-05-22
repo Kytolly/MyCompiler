@@ -5,10 +5,6 @@
 23 ;
 24 \EOL
 03 integer
-10 m
-23 ;
-24 \EOL
-03 integer
 07 function
 10 F
 21 (
@@ -26,12 +22,10 @@
 10 n
 14 <=
 11 0
-24 \EOL
 05 then
 10 F
 20 :=
 11 1
-23 ;
 24 \EOL
 06 else
 10 F
@@ -44,9 +38,9 @@
 18 -
 11 1
 22 )
-23 ;
 24 \EOL
 02 end
+23 ;
 24 \EOL
 08 read
 21 (

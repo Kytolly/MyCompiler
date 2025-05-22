@@ -113,37 +113,4 @@ impl Env {
             parent: None,
         }
     }
-
-    pub fn enter_scope(&mut self) {
-        let mut new_env = Env::new();
-        new_env.current_level = self.current_level + 1;
-        new_env.parent = Some(Box::new(self.clone()));
-        *self = new_env;
-    }
-
-    pub fn exit_scope(&mut self) {
-        if let Some(parent) = self.parent.take() {
-            *self = *parent;
-        }
-    }
-
-    pub fn add_variable(&mut self, name: String, var: VariableItem) {
-        self.variables.insert(name, var);
-    }
-
-    pub fn add_procedure(&mut self, name: String, proc: ProcedureItem) {
-        self.procedures.insert(name, proc);
-    }
-
-    pub fn lookup_variable(&self, name: &str) -> Option<&VariableItem> {
-        self.variables.get(name).or_else(|| {
-            self.parent.as_ref().and_then(|p| p.lookup_variable(name))
-        })
-    }
-
-    pub fn lookup_procedure(&self, name: &str) -> Option<&ProcedureItem> {
-        self.procedures.get(name).or_else(|| {
-            self.parent.as_ref().and_then(|p| p.lookup_procedure(name))
-        })
-    }
 }

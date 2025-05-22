@@ -1,11 +1,12 @@
 pub mod prep;
 pub mod lex;
-pub mod setting;
+pub mod env;
 pub mod parse;
 
 use prep::Preprocessor;
 use lex::Lexer;
 use parse::Parser;
+// use env::Env;
 
 fn main() {
     let preprocessor = Preprocessor::new("test/pas_test.pas");
