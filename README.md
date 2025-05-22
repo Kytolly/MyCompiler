@@ -1,4 +1,4 @@
-# MyCompiler (UESTC - Compilation Principles)
+# MyCompiler (UESTC-编译原理)
 
 This project is a compiler developed as part of the Compilation Principles course at UESTC. It implements fundamental stages of a compiler, including preprocessing, lexical analysis, and parsing, for a simplified language.
 
