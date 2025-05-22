@@ -9,7 +9,7 @@ use parse::Parser;
 use env::Env;
 
 fn main() {
-    let path = "test/0";
+    let path = "test/6";
     let mode = "file";
     let preprocessor = Preprocessor::new(path);
     println!("---------------------------------");

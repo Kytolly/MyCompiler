@@ -67,31 +67,36 @@ impl Parser {
     }
     fn file_error(&self, errmsg:&ErrorMessage) {
         let path = format!("{}.err", self.name);
-        let mut file = fs::File::create(&path).expect("创建错误文件失败");
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .append(true)
+            .create(true)
+            .open(&path)
+            .expect("Failed to create error file");
         let err_msg = match errmsg {
-            ErrorMessage::SyntaxError => format!("LINE{:?}: 语法错误！", self.line),
-            ErrorMessage::WrongReserveYouMeanFunction => format!("LINE{:?}: wrong reserve: you mean 'function'?", self.line),
-            ErrorMessage::WrongReserveYouMeanRead => format!("LINE{:?}: wrong reserve: you mean 'read'?", self.line),
-            ErrorMessage::WrongReserveYouMeanWrite => format!("LINE{:?}: wrong reserve: you mean 'write'?", self.line),
-            ErrorMessage::WrongAssignToken => format!("LINE{:?}: wrong assign operator: you mean ':='?", self.line),
-            ErrorMessage::InvalidTypeExpectedInterger => format!("LINE{:?}: invalid type: expected INTEGER", self.line),
-            ErrorMessage::InvalidNumber => format!("LINE{:?}: 非法数字！", self.line),
-            ErrorMessage::OverflowIdentifier => format!("LINE{:?}: 标识符长度溢出！", self.line),
-            ErrorMessage::FailMatchingSemicolon => format!("LINE{:?}: 冒号匹配失败！", self.line),
-            ErrorMessage::MissingSemicolon => format!("LINE{:?}: missing a ';' at the end of the statement", self.line),
-            ErrorMessage::MissingLeftParenthesis => format!("LINE{:?}: expected '(' following the function statement", self.line),
-            ErrorMessage::MissingRightParenthesis => format!("LINE{:?}: expected ')' to cover the block", self.line),
-            ErrorMessage::MissingIf => format!("LINE{:?}: expected 'if' ", self.line),
-            ErrorMessage::MissingThen => format!("LINE{:?}: expected 'then' ", self.line),
-            ErrorMessage::MissingElse => format!("LINE{:?}: expected 'else' ", self.line),
-            ErrorMessage::MissingMultiply => format!("LINE{:?}: expected '*' ", self.line),
-            ErrorMessage::SyntaxErrorExpectedABlock => format!("LINE{:?}: syntax error, expected a block", self.line),
-            ErrorMessage::FailMatching => format!("LINE{:?}: 符号匹配错误!", self.line),
-            ErrorMessage::MissingEnd => format!("LINE{:?}: missing END: this block is not covered", self.line),
-            ErrorMessage::ExpectedIdentifier => format!("LINE{:?}: excepted indentifier in this field", self.line),
-            ErrorMessage::FoundRepeatDeclarationInThisField => format!("LINE{:?}: this symbol's declaration repeated in this field", self.line),
+            ErrorMessage::SyntaxError => format!("LINE{:?}: unknown token!\n", self.line),
+            ErrorMessage::WrongReserveYouMeanFunction => format!("LINE{:?}: wrong reserve: you mean 'function'?\n", self.line),
+            ErrorMessage::WrongReserveYouMeanRead => format!("LINE{:?}: wrong reserve: you mean 'read'?\n", self.line),
+            ErrorMessage::WrongReserveYouMeanWrite => format!("LINE{:?}: wrong reserve: you mean 'write'?\n", self.line),
+            ErrorMessage::WrongAssignToken => format!("LINE{:?}: wrong assign operator: you mean ':='?\n", self.line),
+            ErrorMessage::InvalidTypeExpectedInterger => format!("LINE{:?}: invalid type: expected INTEGER\n", self.line),
+            ErrorMessage::InvalidNumber => format!("LINE{:?}: Invalid number!\n", self.line),
+            ErrorMessage::OverflowIdentifier => format!("LINE{:?}: Identifier length overflow!\n", self.line),
+            ErrorMessage::FailMatchingSemicolon => format!("LINE{:?}: Semicolon matching failed!\n", self.line),
+            ErrorMessage::MissingSemicolon => format!("LINE{:?}: missing a ';' at the end of the statement\n", self.line),
+            ErrorMessage::MissingLeftParenthesis => format!("LINE{:?}: expected '(' following the function statement\n", self.line),
+            ErrorMessage::MissingRightParenthesis => format!("LINE{:?}: expected ')' to cover the block\n", self.line),
+            ErrorMessage::MissingIf => format!("LINE{:?}: expected 'if' \n", self.line),
+            ErrorMessage::MissingThen => format!("LINE{:?}: expected 'then' \n", self.line),
+            ErrorMessage::MissingElse => format!("LINE{:?}: expected 'else' \n", self.line),
+            ErrorMessage::MissingMultiply => format!("LINE{:?}: expected '*' \n", self.line),
+            ErrorMessage::SyntaxErrorExpectedABlock => format!("LINE{:?}: syntax error, expected a block\n", self.line),
+            ErrorMessage::FailMatching => format!("LINE{:?}: Symbol matching error!\n", self.line),
+            ErrorMessage::MissingEnd => format!("LINE{:?}: missing END: this block is not covered\n", self.line),
+            ErrorMessage::ExpectedIdentifier => format!("LINE{:?}: Expected identifier in this field\n", self.line),
+            ErrorMessage::FoundRepeatDeclarationInThisField => format!("LINE{:?}: this symbol's declaration repeated in this field\n", self.line),
         };
-        file.write_all(err_msg.as_bytes()).expect("写入错误文件失败");
+        file.write_all(err_msg.as_bytes()).expect("Failed to write error file");
     }
     fn console_error(&self, errmsg: ErrorMessage) {
         // 抛出错误
