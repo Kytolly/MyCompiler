@@ -62,16 +62,16 @@ impl Lexer {
         loop {
             self.getnbc();
             let tk = self.current_token();
-            println!("检测到新的token,其含义为: {} {}", self.get_meaning(&tk), self.token);
-            println!("记录至token流后重置当前token");
+            println!("[new token]:{} {}", self.get_meaning(&tk), self.token);
+            // println!("记录至token流后重置当前token");
             self.stream.push(tk.clone());
             self.token.clear();
             self.peek = None;
-            println!("--------------------------");
+            // println!("--------------------------");
             if tk == Token::Eof {
                 break;
             }
-            println!("当前指向字符{:?}", self.cha);
+            // println!("当前指向字符{:?}", self.cha);
         }
     }
     pub fn save(&mut self){
@@ -111,7 +111,7 @@ impl Lexer {
             ErrorMessage::SyntaxErrorExpectedABlock => format!("LINE{:?}: syntax error, expected a block", self.line),
             ErrorMessage::FailMatching => format!("LINE{:?}: 符号匹配错误!", self.line),
             ErrorMessage::MissingEnd => format!("LINE{:?}: missing END: this block is not covered", self.line),
-            ErrorMessage::NotFoundDeclarationInThisField => format!("LINE{:?}: this symbol's declaration can not be found in this field", self.line),
+            ErrorMessage::ExpectedIdentifier => format!("LINE{:?}: excepted indentifier in this field", self.line),
             ErrorMessage::FoundRepeatDeclarationInThisField => format!("LINE{:?}: this symbol's declaration repeated in this field", self.line),
         };
         file.write_all(err_msg.as_bytes()).expect("写入错误文件失败");
@@ -232,7 +232,7 @@ impl Lexer {
         }else {
             self.peek = None;
         }
-        println!("获得peek符为{:?}", self.peek);
+        // println!("获得peek符为{:?}", self.peek);
     }
     fn reserve(&self) -> Option<Token> {
         // 对token查关键字表,检索到应返回关键字token，没检索到返回None
@@ -341,7 +341,7 @@ impl Lexer {
             self.cha = self.source.chars().nth(self.pos);
         }
 
-        println!("{:?}", self.cha);
+        // println!("{:?}", self.cha);
         if self.cha == Some('\n') {
             self.line += 1;
         }
@@ -361,7 +361,7 @@ impl Lexer {
             self.cha = self.source.chars().nth(self.pos);
         }
         self.token.pop();
-        println!("回退到{:?}", self.cha)
+        // println!("回退到{:?}", self.cha)
     }
     fn skip_bad_line(&mut self) {
         // 处理错误，一直读到换行符
@@ -424,7 +424,7 @@ impl Lexer {
         // 实际上这里也是简化实现，所有的fail指针
         self.getnbc();
 
-        println!("当前字符为{:?}", self.cha);
+        // println!("当前字符为{:?}", self.cha);
         match self.cha {
             // 寻找匹配当前输入的状态
             Some('\n') => {
@@ -502,12 +502,12 @@ impl Lexer {
                 }
             }
             Some(_) if self.is_lu() => {
-                println!("预测为关键字/标识符");
+                // println!("预测为关键字/标识符");
                 self.get_peek();
                 self.lex_indentifier()
             }
             Some(_) if self.is_d() => {
-                println!("预测为数字串");
+                // println!("预测为数字串");
                 self.get_peek();
                 self.lex_digits_str()
             }
@@ -581,11 +581,11 @@ impl Lexer {
             ErrorMessage::MissingEnd => {
                 println!("LINE{:?}: missing END: this block is not covered", self.line);
             }
-            ErrorMessage::NotFoundDeclarationInThisField => {
-                println!("LINE{:?}: 符号在该作用域内找不到声明!", self.line);
+            ErrorMessage::ExpectedIdentifier => {
+                println!("LINE{:?}: expected indentifier", self.line);
             }
             ErrorMessage::FoundRepeatDeclarationInThisField => {
-                println!("LINE{:?}: 符号在该作用域内重复声明!", self.line);
+                println!("LINE{:?}: the declaration of this indentifier repeated in this scope", self.line);
             }
         }
     }

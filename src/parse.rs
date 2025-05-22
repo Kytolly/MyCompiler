@@ -1,7 +1,7 @@
-use crate::env::{Token, ErrorMessage};
+use crate::env::{Token, ErrorMessage, Env};
 
 pub struct Parser {
-    // 语法分析器
+    // LL1语法分析器,基于递归下降办法
     pub stream: Vec<Token>, // 输入的token流
     pub pos: usize, //当前token所在位置
     pub line: usize, // 当前token所在行数
@@ -16,8 +16,8 @@ impl Parser {
         };
         p
     }
-    pub fn analyse(&mut self) -> Result<(), ErrorMessage> {
-        self.parse_node_program()
+    pub fn analyse(&mut self, env: &mut Env) -> Result<(), ErrorMessage> {
+        self.parse_node_program(env)
     }
 
     fn debug(&self) {
@@ -116,11 +116,11 @@ impl Parser {
             ErrorMessage::MissingEnd => {
                 println!("LINE{:?}: missing END: this block is not covered", self.line);
             }
-            ErrorMessage::NotFoundDeclarationInThisField => {
-                println!("LINE{:?}: 符号在该作用域内找不到声明!", self.line);
+            ErrorMessage::ExpectedIdentifier => {
+                println!("LINE{:?}: expected indentifier", self.line);
             }
             ErrorMessage::FoundRepeatDeclarationInThisField => {
-                println!("LINE{:?}: 符号在该作用域内重复声明!", self.line);
+                println!("LINE{:?}: the declaration of this indentifier repeated in this scope", self.line);
             }
         }
         println!("-------------------------");
@@ -139,17 +139,18 @@ impl Parser {
         res
     }
     
-    fn parse_node_program(&mut self) -> Result<(), ErrorMessage>{
+    fn parse_node_program(&mut self, env: &mut Env) -> Result<(), ErrorMessage>{
         // <程序> → <分程序>
-        self.parse_node_block()
+        self.parse_node_block(env)
     }
-    fn parse_node_block(&mut self) -> Result<(), ErrorMessage>{
+    fn parse_node_block(&mut self, env: &mut Env) -> Result<(), ErrorMessage>{
         // <分程序> → begin <说明语句表><执行语句表> end
         match self.match_token(Token::Begin) {
             true => self.advance(),
             false => return self.handle_error(ErrorMessage::SyntaxErrorExpectedABlock)
         }
-        match self.parse_node_declaration_statement_table() {
+        env.enter_scope();
+        match self.parse_node_declaration_statement_table(env) {
             Ok(_) => (),
             Err(e) => return self.handle_error(e),
         }
@@ -162,62 +163,64 @@ impl Parser {
             Err(e) => return self.handle_error(e),
         }
         match self.match_token(Token::End) {
-            true => {
-                self.advance();
-                Ok(())
-            },
+            true => self.advance(),
             false => return self.handle_error(ErrorMessage::MissingEnd)
         }
+        env.exit_scope();
+        Ok(())
     }
-    fn parse_node_declaration_statement_table(&mut self) -> Result<(), ErrorMessage>{
+    fn parse_node_declaration_statement_table(&mut self, env:&mut Env) -> Result<(), ErrorMessage>{
         // <说明语句表> → {<说明语句> ;}
-        // FOLLOW(<说明语句表>) 包含 FIRST(<执行语句表>) 和 'end'
         loop {
-            // 检查当前token是否可以开始一个说明语句 (integer)
             if !self.match_token(Token::Integer) {
-                // 如果不能开始说明语句，检查是否在 FOLLOW 集里
+                // 检查FOLLOW 集
                 match self.current_token() {
                     Token::Read | Token::Write | Token::If | Token::Identifier(_) | Token::End | Token::Eof => {
-                        // 如果在 FOLLOW 集里，说明说明语句表结束
                         return Ok(());
                     },
-                    _ => { // 否则是语法错误
-                        self.handle_error(ErrorMessage::SyntaxError);
-                        return Err(ErrorMessage::SyntaxError);
-                    }
+                    _ => return self.handle_error(ErrorMessage::SyntaxError),
                 }
             }
             
-            // 解析一个说明语句
-            match self.parse_node_declaration_statement() {
+            // 匹配说明语句
+            match self.parse_node_declaration_statement(env) {
                 Ok(_) => (),
                 Err(e) => return self.handle_error(e),
             }
             
-            // 期望匹配分号
+            // 匹配分号
             match self.match_token(Token::Semicolon) {
                 true => self.advance(),
                 false => return self.handle_error(ErrorMessage::MissingSemicolon),
             }
         }
     }
-    fn parse_node_declaration_statement(&mut self) -> Result<(), ErrorMessage>{
+    fn parse_node_declaration_statement(&mut self, env: &mut Env) -> Result<(), ErrorMessage>{
         // <说明语句> → integer <说明语句'>
         match self.match_token(Token::Integer) {
             true => self.advance(),
             false => return self.handle_error(ErrorMessage::InvalidTypeExpectedInterger)
         }
-        self.parse_node_declaration_statement_prime()
+        self.parse_node_declaration_statement_prime(env)
     }
-    fn parse_node_declaration_statement_prime(&mut self) -> Result<(), ErrorMessage>{
+    fn parse_node_declaration_statement_prime(&mut self, env: &mut Env) -> Result<(), ErrorMessage>{
         // <说明语句'> → <变量> | function <标识符>（<参数>）<函数体> ;
         if self.match_token(Token::Function) {
             // 函数说明分支
             self.advance();
-            match self.parse_node_identifier() {
-                Ok(_) => (),
+
+            // 获取函数标识符名称
+            let pname = match self.parse_node_identifier() {
+                Ok(pname) => pname,
                 Err(e) => return self.handle_error(e),
+            };
+            // 检查是否重复声明，若没有则添加声明
+            if env.check_repeat(pname.clone()){
+                return self.handle_error(ErrorMessage::FoundRepeatDeclarationInThisField);
+            } else{
+                env.add_procedure(pname.clone());
             }
+
             match self.match_token(Token::LeftParenthesis) {
                 true => self.advance(),
                 false => return self.handle_error(ErrorMessage::MissingLeftParenthesis)
@@ -230,34 +233,39 @@ impl Parser {
                 true => self.advance(),
                 false => return self.handle_error(ErrorMessage::MissingRightParenthesis)
             }
-            // 在函数体后期望匹配分号
             match self.match_token(Token::Semicolon) {
                 true => {
                     self.advance();
-                    match self.parse_node_function_body() {
+                    match self.parse_node_function_body(env) {
                         Ok(_) => Ok(()),
                         Err(e) => return self.handle_error(e),
                     }
                 },
-                false => { // 如果没有分号，是语法错误
-                    return self.handle_error(ErrorMessage::MissingSemicolon);
-                }
+                false => self.handle_error(ErrorMessage::MissingSemicolon),
             }
         } else {
             // 变量说明分支
-            match self.parse_node_variable() {
-                Ok(_) => Ok(()),
+            // 获取变量名字
+            let vname = match self.parse_node_variable() {
+                Ok(vname) => vname,
                 Err(e) => return self.handle_error(e),
+            };
+            // 检查是否重复声明，若没有则添加声明
+            if env.check_repeat(vname.clone()){
+                return self.handle_error(ErrorMessage::FoundRepeatDeclarationInThisField);
+            } else{
+                env.add_variable(vname.clone(), "F".to_string(),0);
+                Ok(())
             }
         }
     }
-    fn parse_node_function_body(&mut self) -> Result<(), ErrorMessage>{
+    fn parse_node_function_body(&mut self, env:&mut Env) -> Result<(), ErrorMessage>{
         // <函数体> → begin <说明语句表><执行语句表> end
         match self.match_token(Token::Begin) {
             true => self.advance(),
             false => return self.handle_error(ErrorMessage::SyntaxErrorExpectedABlock)
         }
-        match self.parse_node_declaration_statement_table() {
+        match self.parse_node_declaration_statement_table(env) {
             Ok(_) => (),
             Err(e) => return self.handle_error(e),
         }
@@ -298,10 +306,7 @@ impl Parser {
                     // 如果在，说明执行语句表结束
                     return Ok(());
                 },
-                _ => { // 否则是语法错误
-                    self.handle_error(ErrorMessage::SyntaxError);
-                    return Err(ErrorMessage::SyntaxError);
-                }
+                _ => return self.handle_error(ErrorMessage::SyntaxError),
             }
             
             // 解析一个执行语句
@@ -488,7 +493,7 @@ impl Parser {
         }
     }
     fn parse_node_factor(&mut self) -> Result<(), ErrorMessage>{
-        // <因子> → ( <表达式> ) | <常量> | <变量> | <函数调用>
+        // <因子> → <标识符> <因子后缀> | <常数> | (<算术表达式>)
         match self.current_token() {
             Token::LeftParenthesis => {
                 self.advance();
@@ -506,29 +511,24 @@ impl Parser {
             },
             Token::IntegerLiteral(_) => self.parse_node_constant(),
             Token::Identifier(_) => {
-                // 需要前看一个token来判断是变量还是函数调用
-                if let Some(next_token) = self.stream.get(self.pos + 1) {
-                    if *next_token == Token::LeftParenthesis {
-                        self.parse_node_function_call()
-                    } else {
-                        self.parse_node_variable()
-                    }
-                } else {
-                    self.parse_node_variable()
+                match self.parse_node_identifier() {
+                    Ok(_) => (),
+                    Err(e) => return self.handle_error(e),
                 }
+                match self.parse_node_factor_suffix() {
+                    Ok(_) => (),
+                    Err(e) => return self.handle_error(e),
+                }
+                Ok(())
             },
             _ => self.handle_error(ErrorMessage::SyntaxError)
         }
     }
-    fn parse_node_function_call(&mut self) -> Result<(), ErrorMessage>{
-        // <函数调用> → <标识符>(<参数>)
-        match self.parse_node_identifier() {
-            Ok(_) => (),
-            Err(e) => return self.handle_error(e),
-        }
+    fn parse_node_factor_suffix(&mut self) -> Result<(), ErrorMessage>{
+        // <因子后缀> → (<参数>)| ε
         match self.match_token(Token::LeftParenthesis) {
             true => self.advance(),
-            false => return self.handle_error(ErrorMessage::MissingLeftParenthesis)
+            false => return Ok(()),
         }
         match self.parse_node_parameter() {
             Ok(_) => (),
@@ -552,11 +552,11 @@ impl Parser {
             _ => self.handle_error(ErrorMessage::SyntaxError)
         }
     }
-    fn parse_node_variable(&mut self) -> Result<(), ErrorMessage>{
+    fn parse_node_variable(&mut self) -> Result<String, ErrorMessage>{
         // <变量> → <标识符>
         match self.parse_node_identifier() {
-            Ok(_) => Ok(()),
-            Err(e) => return self.handle_error(e),
+            Ok(name) => Ok(name),
+            Err(e) => return Err(e),
         }
     }
     fn parse_node_constant(&mut self) -> Result<(), ErrorMessage>{
@@ -569,14 +569,14 @@ impl Parser {
             _ => self.handle_error(ErrorMessage::InvalidNumber)
         }
     }
-    fn parse_node_identifier(&mut self) -> Result<(), ErrorMessage>{
+    fn parse_node_identifier(&mut self) -> Result<String, ErrorMessage>{
         // <标识符>
         match self.current_token() {
-            Token::Identifier(_) => {
+            Token::Identifier(name) => {
                 self.advance();
-                Ok(())
+                Ok(name.clone())
             },
-            _ => self.handle_error(ErrorMessage::NotFoundDeclarationInThisField)
+            _ => Err(ErrorMessage::ExpectedIdentifier),
         }
     }
 }
