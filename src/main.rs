@@ -9,7 +9,7 @@ use parse::Parser;
 // use env::Env;
 
 fn main() {
-    let preprocessor = Preprocessor::new("test/pas_test.pas");
+    let preprocessor = Preprocessor::new("test/3.pas");
     let mut lexer = Lexer::new(preprocessor);
     lexer.analyse();
     lexer.save();
