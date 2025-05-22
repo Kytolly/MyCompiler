@@ -9,10 +9,12 @@ use parse::Parser;
 use env::Env;
 
 fn main() {
-    let preprocessor = Preprocessor::new("test/0.pas");
+    let path = "test/0";
+    let mode = "file";
+    let preprocessor = Preprocessor::new(path);
     println!("---------------------------------");
 
-    let mut lexer = Lexer::new(preprocessor);
+    let mut lexer = Lexer::new(preprocessor, path, mode);
     lexer.analyse();
     lexer.save();
     println!("---------------------------------");
@@ -20,7 +22,7 @@ fn main() {
     let mut env = Env::new();
     let s = lexer.get_stream();
     
-    let mut parser = Parser::new(s);
+    let mut parser = Parser::new(s, mode, path.to_string());
     match parser.analyse(&mut env) {
         Ok(()) => println!("compilered!"),
         _ => println!("syntax error!")

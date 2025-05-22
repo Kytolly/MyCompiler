@@ -2,18 +2,17 @@ use std::fs::File;
 use std::io::{Read};
 
 pub struct Preprocessor {
-    pub name: String, // 源程序名
+    pub path: String, // 源程序名
     pub content: String, // 源程序字符流
 }
 
 impl Preprocessor {
-    pub fn new(path: &str) -> Self{
-        let parts :Vec<&str>= path.split('.').collect();
+    pub fn new(name: &str) -> Self{
         let mut p = Preprocessor{
-            name: parts.first().unwrap_or(&"").to_string(),
+            path: name.to_string() + ".pas",
             content: String::new(),
         };
-        let mut input = File::open(path).unwrap();
+        let mut input = File::open(&p.path).unwrap();
         input.read_to_string(&mut p.content).unwrap();
         println!("{}", p.content);
         p

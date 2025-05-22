@@ -1,18 +1,24 @@
 use crate::env::{Token, ErrorMessage, Env};
+use std::fs;
+use std::io::{Write};
 
 pub struct Parser {
     // LL1语法分析器,基于递归下降办法
     pub stream: Vec<Token>, // 输入的token流
     pub pos: usize, //当前token所在位置
     pub line: usize, // 当前token所在行数
+    mode: &'static str, // 错误的打印模式
+    name: String,
 }
 
 impl Parser {
-    pub fn new(s: Vec<Token>) -> Self {
+    pub fn new(s: Vec<Token>, mode: &'static str, name: String) -> Self {
         let p = Parser {
             stream: s,
             pos: 0,
             line: 1,
+            mode: mode,
+            name: name,
         };
         p
     }
@@ -53,11 +59,46 @@ impl Parser {
         self.current_token() == tk
     }
     fn error(&self, errmsg: ErrorMessage) {
+        match self.mode {
+            "console" => self.console_error(errmsg),
+            "file" => self.file_error(&errmsg),
+            _ => println!("invalid mode!"),
+        };
+    }
+    fn file_error(&self, errmsg:&ErrorMessage) {
+        let path = format!("{}.err", self.name);
+        let mut file = fs::File::create(&path).expect("创建错误文件失败");
+        let err_msg = match errmsg {
+            ErrorMessage::SyntaxError => format!("LINE{:?}: 语法错误！", self.line),
+            ErrorMessage::WrongReserveYouMeanFunction => format!("LINE{:?}: wrong reserve: you mean 'function'?", self.line),
+            ErrorMessage::WrongReserveYouMeanRead => format!("LINE{:?}: wrong reserve: you mean 'read'?", self.line),
+            ErrorMessage::WrongReserveYouMeanWrite => format!("LINE{:?}: wrong reserve: you mean 'write'?", self.line),
+            ErrorMessage::WrongAssignToken => format!("LINE{:?}: wrong assign operator: you mean ':='?", self.line),
+            ErrorMessage::InvalidTypeExpectedInterger => format!("LINE{:?}: invalid type: expected INTEGER", self.line),
+            ErrorMessage::InvalidNumber => format!("LINE{:?}: 非法数字！", self.line),
+            ErrorMessage::OverflowIdentifier => format!("LINE{:?}: 标识符长度溢出！", self.line),
+            ErrorMessage::FailMatchingSemicolon => format!("LINE{:?}: 冒号匹配失败！", self.line),
+            ErrorMessage::MissingSemicolon => format!("LINE{:?}: missing a ';' at the end of the statement", self.line),
+            ErrorMessage::MissingLeftParenthesis => format!("LINE{:?}: expected '(' following the function statement", self.line),
+            ErrorMessage::MissingRightParenthesis => format!("LINE{:?}: expected ')' to cover the block", self.line),
+            ErrorMessage::MissingIf => format!("LINE{:?}: expected 'if' ", self.line),
+            ErrorMessage::MissingThen => format!("LINE{:?}: expected 'then' ", self.line),
+            ErrorMessage::MissingElse => format!("LINE{:?}: expected 'else' ", self.line),
+            ErrorMessage::MissingMultiply => format!("LINE{:?}: expected '*' ", self.line),
+            ErrorMessage::SyntaxErrorExpectedABlock => format!("LINE{:?}: syntax error, expected a block", self.line),
+            ErrorMessage::FailMatching => format!("LINE{:?}: 符号匹配错误!", self.line),
+            ErrorMessage::MissingEnd => format!("LINE{:?}: missing END: this block is not covered", self.line),
+            ErrorMessage::ExpectedIdentifier => format!("LINE{:?}: excepted indentifier in this field", self.line),
+            ErrorMessage::FoundRepeatDeclarationInThisField => format!("LINE{:?}: this symbol's declaration repeated in this field", self.line),
+        };
+        file.write_all(err_msg.as_bytes()).expect("写入错误文件失败");
+    }
+    fn console_error(&self, errmsg: ErrorMessage) {
         // 抛出错误
         // 这里还是简化实现
         // 应该扔到标准错误流中，写入文件
         // 不能和标准输出流混合
-        self.debug();
+        // self.debug();
         match errmsg {
             ErrorMessage::SyntaxError => {
                 println!("LINE{:?}: syntax error, exited", self.line);
@@ -134,6 +175,7 @@ impl Parser {
     }
     fn handle_error(&mut self, errmsg: ErrorMessage) -> Result<(), ErrorMessage>{
         let res = Err(errmsg.clone());
+        self.debug();
         self.error(errmsg);
         self.skip_bad_line();
         res
